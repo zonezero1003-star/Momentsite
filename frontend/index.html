@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MomentMarket • Own the Moment</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+  <style>
+    .hero-video {
+      position: fixed; top: 0; left: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+      z-index: -2;
+      filter: brightness(0.55) contrast(1.15);
+    }
+    .hero-overlay {
+      position: fixed; inset: 0;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.35), rgba(0,0,0,0.88));
+      z-index: -1;
+    }
+  </style>
+</head>
+<body class="bg-black text-white overflow-hidden">
+  <video autoplay loop muted playsinline class="hero-video" id="heroVideo">
+    <source src="hero.mp4" type="video/mp4">
+  </video>
+  
+  <div class="hero-overlay"></div>
+
+  <!-- Navbar -->
+  <nav class="fixed top-0 w-full bg-black/80 backdrop-blur-md z-50 border-b border-white/10">
+    <div class="max-w-6xl mx-auto px-8 py-6 flex justify-between items-center">
+      <div class="flex items-center gap-4">
+        <div class="text-4xl">⚽</div>
+        <span class="text-3xl font-bold tracking-tighter">MomentMarket</span>
+      </div>
+      <button onclick="connectWallet()" 
+              class="px-8 py-3 bg-white text-black rounded-2xl font-semibold hover:bg-cyan-400 transition">
+        Connect Wallet
+      </button>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <div class="min-h-screen flex items-center relative">
+    <div class="max-w-4xl mx-auto px-8 text-center z-10 pt-20">
+      <div class="inline-flex bg-white/10 px-6 py-2.5 rounded-3xl border border-white/20 mb-10 text-sm backdrop-blur-md">
+        Powered by TxODDS • World Cup Hackathon
+      </div>
+      
+      <h1 class="text-6xl md:text-7xl font-bold leading-none tracking-tighter mb-8">
+        See the magic<br>before it becomes obvious
+      </h1>
+      
+      <p class="max-w-xl mx-auto text-xl text-zinc-300 mb-12">
+        Real-time football moments captured, verified on-chain, and turned into ownable NFTs.
+      </p>
+
+      <div class="flex flex-col sm:flex-row gap-5 justify-center">
+        <button onclick="mintMoment()" 
+                class="px-12 py-6 bg-white text-black font-bold rounded-3xl text-xl hover:bg-cyan-400 transition">
+          Mint This Moment
+        </button>
+        <button onclick="viewMarketplace()" 
+                class="px-12 py-6 border border-white/60 hover:bg-white/10 rounded-3xl text-xl transition">
+          Browse Marketplace
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Play/Pause Button -->
+  <button onclick="toggleVideo()" id="videoToggle"
+          class="fixed bottom-8 right-8 z-50 bg-black/70 hover:bg-zinc-900 border border-white/30 w-14 h-14 rounded-2xl flex items-center justify-center text-2xl transition-all">
+    <i class="fas fa-pause" id="toggleIcon"></i>
+  </button>
+
+  <script>
+    const video = document.getElementById('heroVideo');
+    const icon = document.getElementById('toggleIcon');
+
+    function toggleVideo() {
+      if (video.paused) {
+        video.play();
+        icon.classList.replace('fa-play', 'fa-pause');
+      } else {
+        video.pause();
+        icon.classList.replace('fa-pause', 'fa-play');
+      }
+    }
+
+    video.play().catch(() => {});
+
+    function mintMoment() { alert("Minting moment... (demo)"); }
+    function viewMarketplace() { alert("Opening marketplace... (demo)"); }
+    function connectWallet() { alert("Connecting wallet... (demo)"); }
+  </script>
+</body>
+</html>
