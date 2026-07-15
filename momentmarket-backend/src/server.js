@@ -17,21 +17,26 @@ async function main() {
   const backendWallet = loadBackendWallet();
   console.log("Backend wallet:", backendWallet.publicKey.toString());
 
-  console.log("Setting up TxLINE session (subscribe + activate)...");
-  const session = await ensureTxLineSession(backendWallet);
-  console.log("TxLINE session ready.");
-
   // fixtureId -> latest odds snapshot, read by predictions.js when minting
   const latestOdds = new Map();
 
   app.use("/api/predictions", predictionsRouter({ backendWallet, latestOdds }));
   app.use("/api/marketplace", marketplaceRouter({ backendWallet }));
 
-  startResolver({ session, backendWallet, latestOdds });
-
+  // Bind the port immediately so Railway's healthcheck passes and the
+  // service stays up even if TxLINE is unreachable or rejects us.
   app.listen(config.port, () => {
     console.log(`MomentMarket backend listening on :${config.port}`);
   });
+
+  console.log("Setting up TxLINE session (subscribe + activate)...");
+  try {
+    const session = await ensureTxLineSession(backendWallet);
+    console.log("TxLINE session ready.");
+    startResolver({ session, backendWallet, latestOdds });
+  } catch (err) {
+    console.error("TxLINE session setup failed — server is up, but odds resolution is disabled:", err.message);
+  }
 }
 
 main().catch((err) => {
