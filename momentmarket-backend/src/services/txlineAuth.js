@@ -6,7 +6,7 @@ import {
   getAssociatedTokenAddressSync,
   createAssociatedTokenAccountInstruction,
 } from "@solana/spl-token";
-import { PublicKey, SystemProgram } from "@solana/web3.js";
+import { PublicKey, SystemProgram, ComputeBudgetProgram } from "@solana/web3.js";
 import axios from "axios";
 import nacl from "tweetnacl";
 import { connection } from "./solana.js";
@@ -48,7 +48,8 @@ export async function ensureTxLineSession(backendWallet) {
 
     const SELECTED_LEAGUES = []; // Free standard bundle
 
-    const txSig = await program.methods
+    // Add priority fee + compute budget to help confirmation
+    const tx = await program.methods
       .subscribe(config.serviceLevel, 4)
       .accounts({
         user: provider.wallet.publicKey,
@@ -61,21 +62,33 @@ export async function ensureTxLineSession(backendWallet) {
         associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
       })
-      .rpc();
+      .preInstructions([
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }),
+        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10000 })
+      ])
+      .transaction();
+
+    const txSig = await provider.sendAndConfirm(tx, [], { commitment: "confirmed", maxRetries: 3 });
 
     console.log("Subscribe tx:", txSig);
 
+    // Get guest JWT
     const authResponse = await axios.post(`${txline.apiOrigin}/auth/guest/start`);
     const jwt = authResponse.data.token;
+    console.log("Guest JWT received");
 
-    // Exact free-bundle message from docs
-    const messageString = `\( {txSig}: \){SELECTED_LEAGUES.join(",")}:${jwt}`;
-    const signatureBytes = nacl.sign.detached(
-      new TextEncoder().encode(messageString),
-      backendWallet.secretKey
-    );
+    // === EXACT FREE BUNDLE MESSAGE (double colon is required) ===
+    const messageString = `\( {txSig}:: \){jwt}`;
+    console.log("🔑 Signing exact message:", messageString);
+
+    const messageBytes = new TextEncoder().encode(messageString);
+    const signatureBytes = nacl.sign.detached(messageBytes, backendWallet.secretKey);
     const walletSignature = Buffer.from(signatureBytes).toString("base64");
 
+    console.log("🔑 Wallet signature (base64):", walletSignature);
+    // === END ===
+
+    // Activate
     const activationResponse = await axios.post(
       `${txline.apiOrigin}/api/token/activate`,
       { txSig, walletSignature, leagues: SELECTED_LEAGUES },
