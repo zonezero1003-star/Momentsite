@@ -70,31 +70,94 @@
     </div>
   </div>
 
-  <!-- Play/Pause Button -->
-  <button onclick="toggleVideo()" id="videoToggle"
-          class="fixed bottom-8 right-8 z-50 bg-black/70 hover:bg-zinc-900 border border-white/30 w-14 h-14 rounded-2xl flex items-center justify-center text-2xl transition-all">
-    <i class="fas fa-pause" id="toggleIcon"></i>
-  </button>
+  <!-- Marketplace Listings (hidden until Browse Marketplace is clicked) -->
+  <div id="marketplaceSection" class="hidden relative z-10 max-w-5xl mx-auto px-8 pb-24">
+    <h2 class="text-3xl font-bold mb-6">Marketplace</h2>
+    <div id="listingsContainer" class="grid grid-cols-1 sm:grid-cols-2 gap-6"></div>
+  </div>
 
   <script>
     const video = document.getElementById('heroVideo');
-    const icon = document.getElementById('toggleIcon');
+    video.play().catch(() => {});
 
-    function toggleVideo() {
-      if (video.paused) {
-        video.play();
-        icon.classList.replace('fa-play', 'fa-pause');
-      } else {
-        video.pause();
-        icon.classList.replace('fa-pause', 'fa-play');
+    const API_BASE = "https://momentsite-production.up.railway.app";
+    let connectedWallet = null;
+
+    async function viewMarketplace() {
+      const section = document.getElementById('marketplaceSection');
+      const container = document.getElementById('listingsContainer');
+      section.classList.remove('hidden');
+      container.innerHTML = '<p class="text-zinc-400">Loading listings...</p>';
+
+      try {
+        const res = await fetch(`${API_BASE}/api/marketplace/listings`);
+        if (!res.ok) throw new Error(`Server responded ${res.status}`);
+        const data = await res.json();
+        const listings = Array.isArray(data) ? data : (data.listings || []);
+
+        if (!listings.length) {
+          container.innerHTML = '<p class="text-zinc-400">No listings yet.</p>';
+          return;
+        }
+
+        container.innerHTML = listings.map((item) => `
+          <div class="bg-white/5 border border-white/10 rounded-2xl p-6">
+            <p class="font-semibold text-lg">${item.match || item.fixtureId || 'Moment'}</p>
+            <p class="text-zinc-400 text-sm mt-1">${item.predictedEvent || ''}</p>
+            <p class="text-zinc-300 mt-3">${item.price ? `Price: ${item.price}` : ''}</p>
+          </div>
+        `).join('');
+      } catch (err) {
+        console.error("Failed to load marketplace listings:", err);
+        container.innerHTML = '<p class="text-red-400">Could not load listings. Backend may be unreachable.</p>';
       }
     }
 
-    video.play().catch(() => {});
+    async function mintMoment() {
+      if (!connectedWallet) {
+        alert("Connect your wallet first so we know which address should own the minted moment.");
+        return;
+      }
 
-    function mintMoment() { alert("Minting moment... (demo)"); }
-    function viewMarketplace() { alert("Opening marketplace... (demo)"); }
-    function connectWallet() { alert("Connecting wallet... (demo)"); }
+      // NOTE: fixtureId/predictedEvent below need to come from a real fixture
+      // picker once that UI exists — these are placeholders so the request
+      // doesn't 400 immediately. predictedEvent must be one of the values
+      // SUPPORTED_MOMENT_TYPES accepts on the backend (e.g. "goal").
+      try {
+        const res = await fetch(`${API_BASE}/api/predictions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ownerPublicKey: connectedWallet,
+            fixtureId: "REPLACE_WITH_REAL_FIXTURE_ID",
+            predictedEvent: "goal"
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          alert(`Mint failed: ${data.error || res.status}`);
+          return;
+        }
+        alert("Moment minted! Asset: " + data.prediction.assetAddress);
+      } catch (err) {
+        console.error("Mint request failed:", err);
+        alert("Mint failed — backend unreachable.");
+      }
+    }
+
+    async function connectWallet() {
+      if (window.solana && window.solana.isPhantom) {
+        try {
+          const resp = await window.solana.connect();
+          connectedWallet = resp.publicKey.toString();
+          alert("Wallet connected: " + connectedWallet);
+        } catch (err) {
+          console.error("Wallet connection rejected:", err);
+        }
+      } else {
+        alert("Phantom wallet not found — install it to connect.");
+      }
+    }
   </script>
 </body>
 </html>
