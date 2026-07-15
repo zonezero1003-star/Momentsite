@@ -13,6 +13,14 @@ app.use(express.json());
 
 app.get("/health", (req, res) => res.json({ ok: true, network: config.network }));
 
+app.get("/", (req, res) => {
+  res.json({
+    name: "MomentMarket backend",
+    status: "running",
+    endpoints: ["/health", "/api/predictions", "/api/marketplace"],
+  });
+});
+
 async function main() {
   const backendWallet = loadBackendWallet();
   console.log("Backend wallet:", backendWallet.publicKey.toString());
