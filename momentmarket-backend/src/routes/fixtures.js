@@ -29,20 +29,17 @@ export function fixturesRouter({ session }) {
       const result = await client(session).get("/api/fixtures/snapshot");
       const raw = result.data || [];
 
-      // TEMP: hit /api/fixtures?raw=1 to see the first untouched fixture
-      // object exactly as TxLINE sends it, so we can fix the field mapping
-      // below instead of guessing. Remove this once mapping is confirmed.
-      if (req.query.raw) {
-        return res.json({ ok: true, sample: raw[0] ?? null, count: raw.length });
-      }
-
-      const fixtures = raw.map((f) => ({
-        fixtureId: f.FixtureId ?? f.fixtureId,
-        home: f.HomeTeam ?? f.homeTeam ?? "Home",
-        away: f.AwayTeam ?? f.awayTeam ?? "Away",
-        status: f.StatusId ?? f.statusId ?? null,
-        kickoff: f.StartTime ?? f.startTime ?? null,
-      })).filter((f) => f.fixtureId != null);
+      const fixtures = raw.map((f) => {
+        const isP1Home = f.Participant1IsHome !== false; // default true if missing
+        return {
+          fixtureId: f.FixtureId,
+          home: isP1Home ? f.Participant1 : f.Participant2,
+          away: isP1Home ? f.Participant2 : f.Participant1,
+          status: f.GameState ?? null,
+          kickoff: f.StartTime ?? null,
+          competition: f.Competition ?? null,
+        };
+      }).filter((f) => f.fixtureId != null);
 
       res.json({ ok: true, fixtures });
     } catch (err) {
