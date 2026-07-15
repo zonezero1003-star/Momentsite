@@ -78,7 +78,7 @@ export async function ensureTxLineSession(backendWallet) {
     console.log("Guest JWT received");
 
     // === EXACT FREE BUNDLE MESSAGE (double colon is required) ===
-    const messageString = `\( {txSig}:: \){jwt}`;
+    const messageString = $ { txSig } : : $ { jwt } ;
     console.log("🔑 Signing exact message:", messageString);
 
     const messageBytes = new TextEncoder().encode(messageString);
