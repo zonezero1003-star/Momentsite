@@ -16,7 +16,8 @@
  */
 import EventSource from "eventsource";
 import axios from "axios";
-import { BN } from "@coral-xyz/anchor";
+import anchorPkg from "@coral-xyz/anchor";
+const { BN } = anchorPkg;
 import { PublicKey, ComputeBudgetProgram } from "@solana/web3.js";
 import { config } from "../config.js";
 
