@@ -1,6 +1,0 @@
-{
-  "_comment": "PLACEHOLDER. Replace this file with the real Txoracle IDL for your chosen network (devnet vs mainnet — they differ). It's referenced in TxLINE's docs under 'Runnable Devnet Examples' at /documentation/examples/devnet-examples, and should also be downloadable from their examples repo. Do not attempt to hand-write this file - Anchor IDLs are generated from the on-chain program and must match exactly or `program.methods.subscribe()` will fail.",
-  "version": "0.0.0",
-  "name": "txoracle",
-  "instructions": []
-}
