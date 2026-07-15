@@ -76,12 +76,60 @@
     <div id="listingsContainer" class="grid grid-cols-1 sm:grid-cols-2 gap-6"></div>
   </div>
 
+  <!-- Mint Modal -->
+  <div id="mintModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center px-6">
+    <div class="bg-zinc-900 border border-white/10 rounded-3xl p-8 max-w-md w-full">
+      <div class="flex justify-between items-center mb-6">
+        <h3 class="text-2xl font-bold">Mint a Moment</h3>
+        <button onclick="closeMintModal()" class="text-zinc-400 hover:text-white text-xl">✕</button>
+      </div>
+
+      <!-- Step 1: pick fixture + event -->
+      <div id="mintPickerStep">
+        <label class="block text-sm text-zinc-400 mb-2">Match</label>
+        <select id="fixtureSelect" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 mb-5 text-white">
+          <option value="">Loading fixtures...</option>
+        </select>
+
+        <label class="block text-sm text-zinc-400 mb-2">Predicted event</label>
+        <select id="momentTypeSelect" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 mb-6 text-white">
+          <option value="">Loading options...</option>
+        </select>
+
+        <button onclick="generatePreview()"
+                class="w-full py-4 bg-white text-black font-bold rounded-2xl hover:bg-cyan-400 transition">
+          Generate Preview
+        </button>
+      </div>
+
+      <!-- Step 2: show generated card, confirm or go back -->
+      <div id="mintPreviewStep" class="hidden">
+        <div id="previewImageWrap" class="w-full aspect-[3/4] bg-white/5 rounded-2xl mb-5 flex items-center justify-center overflow-hidden">
+          <p class="text-zinc-500 text-sm">Generating card...</p>
+        </div>
+        <div class="flex gap-3">
+          <button onclick="backToPicker()"
+                  class="flex-1 py-4 border border-white/30 rounded-2xl hover:bg-white/10 transition">
+            Back
+          </button>
+          <button onclick="confirmMint()"
+                  class="flex-1 py-4 bg-white text-black font-bold rounded-2xl hover:bg-cyan-400 transition">
+            Mint This
+          </button>
+        </div>
+      </div>
+
+      <p id="mintModalError" class="text-red-400 text-sm mt-3 hidden"></p>
+    </div>
+  </div>
+
   <script>
     const video = document.getElementById('heroVideo');
     video.play().catch(() => {});
 
     const API_BASE = "https://momentsite-production.up.railway.app";
     let connectedWallet = null;
+    let pendingMint = null; // { fixtureId, predictedEvent, match, imageUri }
 
     async function viewMarketplace() {
       const section = document.getElementById('marketplaceSection');
@@ -119,29 +167,135 @@
         return;
       }
 
-      // NOTE: fixtureId/predictedEvent below need to come from a real fixture
-      // picker once that UI exists — these are placeholders so the request
-      // doesn't 400 immediately. predictedEvent must be one of the values
-      // SUPPORTED_MOMENT_TYPES accepts on the backend (e.g. "goal").
+      const modal = document.getElementById('mintModal');
+      const fixtureSelect = document.getElementById('fixtureSelect');
+      const momentTypeSelect = document.getElementById('momentTypeSelect');
+      const errorEl = document.getElementById('mintModalError');
+      errorEl.classList.add('hidden');
+      modal.classList.remove('hidden');
+      showPickerStep();
+
+      fixtureSelect.innerHTML = '<option value="">Loading fixtures...</option>';
+      momentTypeSelect.innerHTML = '<option value="">Loading options...</option>';
+
+      try {
+        const [fixturesRes, momentTypesRes] = await Promise.all([
+          fetch(`${API_BASE}/api/fixtures`),
+          fetch(`${API_BASE}/api/fixtures/moment-types`)
+        ]);
+
+        const fixturesData = await fixturesRes.json();
+        const momentTypesData = await momentTypesRes.json();
+
+        if (!fixturesRes.ok) throw new Error(fixturesData.error || "Could not load fixtures");
+        if (!momentTypesRes.ok) throw new Error(momentTypesData.error || "Could not load moment types");
+
+        const fixtures = fixturesData.fixtures || [];
+        fixtureSelect.innerHTML = fixtures.length
+          ? fixtures.map((f) => `<option value="${f.fixtureId}" data-match="${f.home} vs ${f.away}">${f.home} vs ${f.away}</option>`).join('')
+          : '<option value="">No live fixtures right now</option>';
+
+        const momentTypes = momentTypesData.momentTypes || [];
+        momentTypeSelect.innerHTML = momentTypes
+          .map((t) => `<option value="${t}">${t.replace('_', ' ')}</option>`).join('');
+      } catch (err) {
+        console.error("Failed to load mint options:", err);
+        errorEl.textContent = "Could not load fixtures/moment types — backend may be unreachable.";
+        errorEl.classList.remove('hidden');
+      }
+    }
+
+    function showPickerStep() {
+      document.getElementById('mintPickerStep').classList.remove('hidden');
+      document.getElementById('mintPreviewStep').classList.add('hidden');
+    }
+
+    function showPreviewStep() {
+      document.getElementById('mintPickerStep').classList.add('hidden');
+      document.getElementById('mintPreviewStep').classList.remove('hidden');
+    }
+
+    function backToPicker() {
+      pendingMint = null;
+      document.getElementById('mintModalError').classList.add('hidden');
+      showPickerStep();
+    }
+
+    function closeMintModal() {
+      document.getElementById('mintModal').classList.add('hidden');
+      pendingMint = null;
+    }
+
+    async function generatePreview() {
+      const fixtureSelect = document.getElementById('fixtureSelect');
+      const fixtureId = fixtureSelect.value;
+      const match = fixtureSelect.selectedOptions[0]?.dataset.match || fixtureId;
+      const predictedEvent = document.getElementById('momentTypeSelect').value;
+      const errorEl = document.getElementById('mintModalError');
+      errorEl.classList.add('hidden');
+
+      if (!fixtureId || !predictedEvent) {
+        errorEl.textContent = "Pick a match and a predicted event first.";
+        errorEl.classList.remove('hidden');
+        return;
+      }
+
+      showPreviewStep();
+      const imageWrap = document.getElementById('previewImageWrap');
+      imageWrap.innerHTML = '<p class="text-zinc-500 text-sm">Generating card...</p>';
+
+      try {
+        const res = await fetch(`${API_BASE}/api/predictions/preview`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fixtureId, match, predictedEvent })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `Server responded ${res.status}`);
+
+        pendingMint = { fixtureId, predictedEvent, match, imageUri: data.imageUri };
+        imageWrap.innerHTML = `<img src="${data.imageUri}" alt="Predicted moment card" class="w-full h-full object-cover">`;
+      } catch (err) {
+        console.error("Preview generation failed:", err);
+        imageWrap.innerHTML = '<p class="text-red-400 text-sm px-4 text-center">Could not generate preview.</p>';
+        pendingMint = null;
+      }
+    }
+
+    async function confirmMint() {
+      const errorEl = document.getElementById('mintModalError');
+      errorEl.classList.add('hidden');
+
+      if (!pendingMint) {
+        errorEl.textContent = "Generate a preview first.";
+        errorEl.classList.remove('hidden');
+        return;
+      }
+
       try {
         const res = await fetch(`${API_BASE}/api/predictions`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             ownerPublicKey: connectedWallet,
-            fixtureId: "REPLACE_WITH_REAL_FIXTURE_ID",
-            predictedEvent: "goal"
+            fixtureId: pendingMint.fixtureId,
+            match: pendingMint.match,
+            predictedEvent: pendingMint.predictedEvent,
+            imageUri: pendingMint.imageUri
           })
         });
         const data = await res.json();
         if (!res.ok) {
-          alert(`Mint failed: ${data.error || res.status}`);
+          errorEl.textContent = `Mint failed: ${data.error || res.status}`;
+          errorEl.classList.remove('hidden');
           return;
         }
+        closeMintModal();
         alert("Moment minted! Asset: " + data.prediction.assetAddress);
       } catch (err) {
         console.error("Mint request failed:", err);
-        alert("Mint failed — backend unreachable.");
+        errorEl.textContent = "Mint failed — backend unreachable.";
+        errorEl.classList.remove('hidden');
       }
     }
 
