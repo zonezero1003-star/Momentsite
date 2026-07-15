@@ -35,7 +35,7 @@
         <div class="text-4xl">⚽</div>
         <span class="text-3xl font-bold tracking-tighter">MomentMarket</span>
       </div>
-      <button onclick="connectWallet()" 
+      <button onclick="connectWallet()" id="connectWalletBtn"
               class="px-8 py-3 bg-white text-black rounded-2xl font-semibold hover:bg-cyan-400 transition">
         Connect Wallet
       </button>
@@ -123,6 +123,9 @@
     </div>
   </div>
 
+  <!-- Status banner (replaces alert() which some in-app browsers block) -->
+  <div id="statusBanner" class="hidden fixed top-24 left-1/2 -translate-x-1/2 z-[60] bg-zinc-900 border border-white/20 rounded-2xl px-6 py-3 text-sm max-w-[90vw] text-center shadow-xl"></div>
+
   <script>
     const video = document.getElementById('heroVideo');
     video.play().catch(() => {});
@@ -131,10 +134,19 @@
     let connectedWallet = null;
     let pendingMint = null; // { fixtureId, predictedEvent, match, imageUri }
 
+    function showStatus(message, duration = 4000) {
+      const banner = document.getElementById('statusBanner');
+      banner.textContent = message;
+      banner.classList.remove('hidden');
+      clearTimeout(showStatus._t);
+      showStatus._t = setTimeout(() => banner.classList.add('hidden'), duration);
+    }
+
     async function viewMarketplace() {
       const section = document.getElementById('marketplaceSection');
       const container = document.getElementById('listingsContainer');
       section.classList.remove('hidden');
+      section.scrollIntoView({ behavior: 'smooth', block: 'start' });
       container.innerHTML = '<p class="text-zinc-400">Loading listings...</p>';
 
       try {
@@ -163,7 +175,7 @@
 
     async function mintMoment() {
       if (!connectedWallet) {
-        alert("Connect your wallet first so we know which address should own the minted moment.");
+        showStatus("Connect your wallet first so we know which address should own the minted moment.");
         return;
       }
 
@@ -291,7 +303,7 @@
           return;
         }
         closeMintModal();
-        alert("Moment minted! Asset: " + data.prediction.assetAddress);
+        showStatus("Moment minted! Asset: " + data.prediction.assetAddress, 6000);
       } catch (err) {
         console.error("Mint request failed:", err);
         errorEl.textContent = "Mint failed — backend unreachable.";
@@ -300,16 +312,20 @@
     }
 
     async function connectWallet() {
+      const btn = document.getElementById('connectWalletBtn');
       if (window.solana && window.solana.isPhantom) {
         try {
           const resp = await window.solana.connect();
           connectedWallet = resp.publicKey.toString();
-          alert("Wallet connected: " + connectedWallet);
+          const short = connectedWallet.slice(0, 4) + "…" + connectedWallet.slice(-4);
+          if (btn) btn.textContent = short;
+          showStatus("Wallet connected: " + connectedWallet, 5000);
         } catch (err) {
           console.error("Wallet connection rejected:", err);
+          showStatus("Wallet connection was cancelled or rejected.");
         }
       } else {
-        alert("Phantom wallet not found — install it to connect.");
+        showStatus("No Solana wallet found in this browser. Open this site in Phantom's in-app browser, or install the Phantom extension on desktop.", 6000);
       }
     }
   </script>
