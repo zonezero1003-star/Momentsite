@@ -12,15 +12,9 @@ import nacl from "tweetnacl";
 import { connection } from "./solana.js";
 import { config } from "../config.js";
 import txoracleIdl from "../idl/txoracle.json" with { type: "json" };
-// NOTE: Replace this placeholder IDL with the real one from TxLINE's devnet examples repo.
 
-let cachedSession = null; // { jwt, apiToken, expiresAt, program }
+let cachedSession = null;
 
-/**
- * Ensures we have a valid TxLINE session (on-chain subscribe + API token).
- * Creates required ATAs if they don't exist.
- * Safe to call on every startup.
- */
 export async function ensureTxLineSession(backendWallet) {
   if (cachedSession && cachedSession.expiresAt > Date.now()) {
     return cachedSession;
@@ -33,7 +27,6 @@ export async function ensureTxLineSession(backendWallet) {
   const program = new anchor.Program(txoracleIdl, provider);
   const { txline } = config;
 
-  // PDAs and ATAs
   const [tokenTreasuryPda] = PublicKey.findProgramAddressSync(
     [Buffer.from("token_treasury_v2")], program.programId
   );
@@ -47,13 +40,13 @@ export async function ensureTxLineSession(backendWallet) {
     txline.txlTokenMint, provider.wallet.publicKey, false, TOKEN_2022_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID
   );
 
-  // Create ATAs if missing (this was causing the AccountNotInitialized crash)
   await ensureAtaExists(provider, userTokenAccount, provider.wallet.publicKey, txline.txlTokenMint, "user");
   await ensureAtaExists(provider, tokenTreasuryVault, tokenTreasuryPda, txline.txlTokenMint, "treasury vault");
 
-  // Subscribe + Activate
   try {
-    console.log("Setting up TxLINE session (subscribe + activate)...");
+    console.log(`Setting up TxLINE session on ${config.network}...`);
+
+    const SELECTED_LEAGUES = []; // Free standard bundle
 
     const txSig = await program.methods
       .subscribe(config.serviceLevel, 4)
@@ -70,10 +63,13 @@ export async function ensureTxLineSession(backendWallet) {
       })
       .rpc();
 
+    console.log("Subscribe tx:", txSig);
+
     const authResponse = await axios.post(`${txline.apiOrigin}/auth/guest/start`);
     const jwt = authResponse.data.token;
 
-    const messageString = `\( {txSig}:: \){jwt}`;
+    // Exact free-bundle message from docs
+    const messageString = `\( {txSig}: \){SELECTED_LEAGUES.join(",")}:${jwt}`;
     const signatureBytes = nacl.sign.detached(
       new TextEncoder().encode(messageString),
       backendWallet.secretKey
@@ -82,7 +78,7 @@ export async function ensureTxLineSession(backendWallet) {
 
     const activationResponse = await axios.post(
       `${txline.apiOrigin}/api/token/activate`,
-      { txSig, walletSignature, leagues: [] },
+      { txSig, walletSignature, leagues: SELECTED_LEAGUES },
       { headers: { Authorization: `Bearer ${jwt}` } }
     );
 
@@ -95,33 +91,27 @@ export async function ensureTxLineSession(backendWallet) {
       expiresAt: Date.now() + (28 - 1) * 24 * 60 * 60 * 1000,
     };
 
-    console.log("TxLINE session established successfully.");
+    console.log("✅ TxLINE session established successfully");
     return cachedSession;
 
   } catch (err) {
-    console.error("Failed to establish TxLINE session:", err.message || err);
-
-    if (cachedSession) {
-      console.warn("Using previously cached TxLINE session as fallback.");
-      return cachedSession;
-    }
-
-    throw new Error(`TxLINE session setup failed: ${err.message || err}`);
+    console.error("TxLINE setup failed:", {
+      status: err.response?.status,
+      data: err.response?.data,
+      message: err.message
+    });
+    if (cachedSession) return cachedSession;
+    throw err;
   }
 }
 
-/** Helper: Create ATA if it doesn't exist */
 async function ensureAtaExists(provider, ataAddress, owner, mint, label) {
   const info = await connection.getAccountInfo(ataAddress);
   if (!info) {
     console.log(`Creating ${label} ATA...`);
     const ix = createAssociatedTokenAccountInstruction(
-      provider.wallet.publicKey,
-      ataAddress,
-      owner,
-      mint,
-      TOKEN_2022_PROGRAM_ID,
-      ASSOCIATED_TOKEN_PROGRAM_ID
+      provider.wallet.publicKey, ataAddress, owner, mint,
+      TOKEN_2022_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID
     );
     const tx = new anchor.web3.Transaction().add(ix);
     const sig = await provider.sendAndConfirm(tx);
