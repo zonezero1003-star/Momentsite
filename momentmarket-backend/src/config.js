@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { PublicKey } from "@solana/web3.js";
 
-const NETWORK = process.env.SOLANA_NETWORK || "devnet";
+const NETWORK = process.env.SOLANA_NETWORK || "mainnet";   // ← Changed to mainnet
 
 // Confirmed from TxLINE's World Cup Free Tier docs.
 const TXLINE_NETWORKS = {
