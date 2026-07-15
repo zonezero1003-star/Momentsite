@@ -33,9 +33,9 @@ async function main() {
     process.exit(1);
   }
 
-  console.log("--- COPY EVERYTHING BELOW THIS LINE INTO src/idl/txoracle.json ---");
-  console.log(JSON.stringify(idl, null, 2));
-  console.log("--- COPY EVERYTHING ABOVE THIS LINE ---");
+  console.log("---IDL-JSON-START---");
+console.log(JSON.stringify(idl));
+console.log("---IDL-JSON-END---");
 }
 
 main().catch((err) => {
