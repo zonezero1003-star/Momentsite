@@ -1,4 +1,5 @@
-import * as anchor from "@coral-xyz/anchor";
+import anchorPkg from "@coral-xyz/anchor";
+const anchor = anchorPkg;
 import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
   TOKEN_2022_PROGRAM_ID,
