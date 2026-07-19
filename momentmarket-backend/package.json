@@ -19,6 +19,7 @@
     "dotenv": "^16.4.5",
     "eventsource": "^2.0.2",
     "express": "^4.21.0",
+    "pg": "^8.13.1",
     "tweetnacl": "^1.0.3"
   }
 }
