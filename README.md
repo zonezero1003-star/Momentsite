@@ -10,7 +10,7 @@ A fan-first Solana dApp built for the TxODDS World Cup Hackathon (Trading Tools 
 ┌─────────────────────────────────────────────────────────────────────┐
 │                         FRONTEND (Vercel)                          │
 │  Static HTML/JS — Phantom wallet connect, mint UI, marketplace UI  │
-│  momentsite-sigma.vercel.app                                        │
+│  momentsite.vercel.app                                        │
 └───────────────────────────────┬─────────────────────────────────────┘
                                  │ fetch() — REST
                                  ▼
